@@ -12,6 +12,8 @@ int analogBuffer[SCOUNT];    // store the analog value in the array, read from A
 int analogBufferTemp[SCOUNT];
 int analogBufferIndex = 0,copyIndex = 0;
 float averageVoltage = 0,tdsValue = 0,temperature = 25;
+
+WiFiManager wm;
 ///////////////////////////////////////////////////////////////////////////
 
 WiFiClient espClient;
@@ -23,8 +25,14 @@ const char * mqttServer = "192.168.13.235";
 char id[16]; //Create a Unique AP from MAC address
 void createID() {
   //uint64_t chipid=ESP.getEfuseMac() ;//The chip ID is essentially its MAC address(length: 6 bytes).
-  uint32_t chipid=ESP.getChipId();//The chip ID is essentially its MAC address(length: 6 bytes).
-  uint16_t chip = (uint16_t)(chipid>>40);
+ // uint32_t chipid=ESP.getChipId();//The chip ID is essentially its MAC address(length: 6 bytes).
+ // uint16_t chip = (uint16_t)(chipid>>40);
+
+uint32_t chip = 0;
+for(int i=0; i<17; i=i+8) {
+  chip |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+}
+  
   snprintf(id,16,"Robonomics-%04X",chip); 
 }
 
@@ -32,7 +40,12 @@ char ConnectionTopic[37] = "";
 char TDSTopic[32] = "";
 
 void createTOPICS() {
-  uint32_t chip=ESP.getChipId();
+//  uint32_t chip=ESP.getChipId();
+
+uint32_t chip = 0;
+for(int i=0; i<17; i=i+8) {
+  chip |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+}
   snprintf(ConnectionTopic,37,"Robonomics/%08X/connection/status",chip);
   snprintf(TDSTopic,32,"Robonomics/%08X/sensors/TDS",chip);
 }
@@ -92,12 +105,18 @@ void setup()
   createID();
   createTOPICS();
 
-  Serial.println(id);
+  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", "", 40);
+  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", "", 6);
+
+  wm.addParameter(&custom_mqtt_server);
+  wm.addParameter(&custom_mqtt_port);
+    
+  wm.setDarkMode(true);
   // put your setup code here, to run once:
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
-  WiFiManager wm;
+
 
   bool res;
   res = wm.autoConnect(id); // password protected ap
@@ -173,6 +192,4 @@ void loop()
    }
     mqttClient.loop();
   }
-
-
 }
